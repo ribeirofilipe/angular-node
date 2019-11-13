@@ -1,5 +1,6 @@
-import {Component, OnInit} from '@angular/core';
-import {PageEvent} from '@angular/material/paginator';
+import {Component, OnInit, ViewChild} from '@angular/core';
+import {MatPaginator} from '@angular/material/paginator';
+import {MatTableDataSource} from '@angular/material/table';
 
 import axios from 'axios';
 
@@ -19,31 +20,26 @@ export interface PeriodicElement {
 })
 
 export class AppComponent implements OnInit {
-
-  length = 100;
-  pageSize = 10;
-  pageSizeOptions: number[] = [5, 10, 25, 100];
-
-  pageEvent: PageEvent;
-
-  setPageSizeOptions(setPageSizeOptionsInput: string) {
-    this.pageSizeOptions = setPageSizeOptionsInput.split(',').map(str => +str);
-  }
+  @ViewChild(MatPaginator, {static: true}) paginator: MatPaginator;
 
   ngOnInit() {
     this.retornaSkus();
   }
 
-  publicado = true;
-  dataSource = [];
-  title = 'app';
+  dataSource = new MatTableDataSource<PeriodicElement>([]);
+
   displayedColumns: string[] = ['index', 'title', 'partnerId', 'ean', 'price', 'sellPrice'];
+
+  publicado = true;
+  title = 'app';
+  startTime = new Date();
+  endTime = new Date();
 
    retornaSkus = async () => {
     try {
         const result = await axios.get('http://localhost:4444/skus');
-
-        this.dataSource = result.data;
+        this.dataSource = new MatTableDataSource<PeriodicElement>(result.data);
+        this.dataSource.paginator = this.paginator;
         return;
 
     } catch ( error ) {
@@ -53,15 +49,17 @@ export class AppComponent implements OnInit {
 
   publicarSkus = async () => {
     this.publicado = false;
-    this.dataSource.map(async sku => {
-      try {
-        await axios.post('http://localhost:5555/sku', sku);
-      } catch(err) {
-        console.log(err);
-      }
-    })
+    const array = this.dataSource.data.map(async sku => {
+        const response = await axios.post('http://localhost:5555/sku', sku);
+        return response.data;
+    });
 
+    const skus = await Promise.all(array);
     this.publicado = true;
+    var tempoTotal = this.endTime.getTime() - this.startTime.getTime() / 1000;
+
+    alert(`${this.dataSource.data.length} Skus publicados em: ${new Date(tempoTotal).getSeconds()} segundos.`);
+    return skus;
   }
 }
 
